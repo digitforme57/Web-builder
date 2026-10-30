@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#0b0d12"/>
+<title>Assistant IA — Déploiement</title>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0d12; --panel:#12151d; --panel2:#1a1f2b; --line:#232938;
+    --text:#e6e9ef; --muted:#8b93a7; --accent:#5b8cff; --ok:#22c55e; --warn:#f59e0b;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+  svg{display:block;flex-shrink:0}
+  .app{display:grid;grid-template-columns:280px 1fr;height:100dvh;width:100vw}
+  aside#sidebar{background:var(--panel);border-right:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+  .sidebar-header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px}
+  .brand svg{width:20px;height:20px;color:var(--accent)}
+  #closeSidebar{display:none;background:none;border:0;color:var(--muted);cursor:pointer;padding:6px;min-width:36px;min-height:36px;align-items:center;justify-content:center}
+  #closeSidebar svg{width:20px;height:20px}
+  #newProject{background:var(--accent);border:0;color:#fff;padding:11px 14px;border-radius:10px;cursor:pointer;font-weight:600;font-size:14px;min-height:44px;display:flex;align-items:center;justify-content:center;gap:8px}
+  #newProject svg{width:18px;height:18px}
+  #projectList{list-style:none;padding:0;margin:0;overflow-y:auto;flex:1}
+  #projectList li{padding:10px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:44px}
+  #projectList li.active{background:var(--panel2);color:var(--text);font-weight:600}
+  #projectList li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #projectList li a{color:var(--accent);display:flex;align-items:center;padding:4px;flex-shrink:0}
+  #projectList li a svg{width:14px;height:14px}
+  main{display:flex;flex-direction:column;height:100dvh;min-width:0;overflow:hidden}
+  #topbar{padding:10px 14px;padding-top:calc(10px + var(--safe-top));border-bottom:1px solid var(--line);background:var(--panel);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-shrink:0}
+  #menuBtn{display:none;background:none;border:0;color:var(--text);cursor:pointer;padding:8px;min-width:40px;min-height:40px;align-items:center;justify-content:center}
+  #menuBtn svg{width:22px;height:22px}
+  #projectName{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;text-align:center}
+  .status{font-size:11px;color:var(--muted);background:var(--panel2);padding:5px 10px;border-radius:20px;white-space:nowrap;display:flex;align-items:center;gap:6px}
+  .status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--muted)}
+  .status.busy{color:var(--warn)} .status.busy::before{background:var(--warn);animation:pulse 1s infinite}
+  .status.ok{color:var(--ok)} .status.ok::before{background:var(--ok)}
+  @keyframes pulse{50%{opacity:.4}}
+  #messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .msg{max-width:88%;padding:11px 13px;border-radius:14px;white-space:pre-wrap;word-wrap:break-word;line-height:1.5;font-size:14px}
+  .msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+  .msg.assistant{align-self:flex-start;background:var(--panel2);border-bottom-left-radius:4px}
+  .msg .files{margin-top:8px;font-size:11px;color:var(--muted)}
+  .msg .files span{display:inline-block;background:var(--line);padding:3px 8px;border-radius:6px;margin:3px 3px 0 0;word-break:break-all}
+  .msg .preview-btn{margin-top:10px;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:0;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;min-height:38px}
+  .msg .preview-btn svg{width:15px;height:15px}
+  #composer{border-top:1px solid var(--line);background:var(--panel);padding:10px 12px;padding-bottom:calc(10px + var(--safe-bottom));flex-shrink:0}
+  #attachments{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  #attachments .chip{font-size:11px;background:var(--panel2);border:1px solid var(--line);padding:5px 10px;border-radius:20px;display:flex;gap:6px;align-items:center;max-width:100%}
+  #attachments .chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+  #attachments .chip button{background:none;border:0;color:var(--muted);cursor:pointer;padding:0;display:flex;align-items:center}
+  #attachments .chip button svg{width:14px;height:14px}
+  .composer-row{display:flex;gap:6px;align-items:flex-end}
+  .attach{background:var(--panel2);border:1px solid var(--line);width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:10px;cursor:pointer;color:var(--text);flex-shrink:0}
+  .attach svg{width:20px;height:20px}
+  #input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:11px 12px;resize:none;font-family:inherit;font-size:16px;max-height:120px;min-height:44px;line-height:1.4}
+  #input:focus{outline:1px solid var(--accent)}
+  #send{background:var(--accent);color:#fff;border:0;min-height:44px;width:44px;padding:0;border-radius:10px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+  #send svg{width:20px;height:20px}
+  #send:disabled{opacity:.5;cursor:not-allowed}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:100;padding:12px}
+  .modal.hidden{display:none}
+  .modal-box{width:min(1100px,100%);height:min(760px,calc(100dvh - 24px));background:var(--panel);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+  .modal-box header{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-shrink:0}
+  .modal-box header strong{font-size:14px;display:flex;align-items:center;gap:8px}
+  .modal-box header strong svg{width:16px;height:16px;color:var(--accent)}
+  #closePreview{background:none;border:0;color:var(--muted);cursor:pointer;padding:6px;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center}
+  #closePreview svg{width:20px;height:20px}
+  .preview-tabs{display:none;border-bottom:1px solid var(--line);flex-shrink:0}
+  .preview-tabs button{flex:1;background:none;border:0;color:var(--muted);padding:12px;font-size:13px;font-weight:600;cursor:pointer;min-height:44px}
+  .preview-tabs button.active{color:var(--accent);border-bottom:2px solid var(--accent)}
+  .preview-body{flex:1;display:grid;grid-template-columns:260px 1fr;min-height:0}
+  #changedFiles{list-style:none;padding:10px;margin:0;overflow-y:auto;border-right:1px solid var(--line);font-size:13px}
+  #changedFiles li{padding:10px 8px;border-radius:6px;cursor:pointer;color:var(--muted);word-break:break-all;min-height:44px;display:flex;align-items:center;gap:8px}
+  #changedFiles li svg{width:14px;height:14px;flex-shrink:0}
+  #changedFiles li.active,#changedFiles li:active{background:var(--panel2);color:var(--text)}
+  #previewFrame{width:100%;height:100%;border:0;background:#fff;display:block}
+  .modal-box footer{padding:10px 16px;padding-bottom:calc(10px + var(--safe-bottom));border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
+  .modal-box footer button{border:0;padding:12px 18px;border-radius:10px;font-weight:600;cursor:pointer;font-size:14px;min-height:44px;flex:1;max-width:220px;display:flex;align-items:center;justify-content:center;gap:8px}
+  .modal-box footer button svg{width:16px;height:16px}
+  #approvePreview{background:var(--ok);color:#fff}
+  #rejectPreview{background:var(--panel2);color:var(--text)}
+  @media (max-width: 768px){
+    .app{grid-template-columns:1fr}
+    aside#sidebar{position:fixed;top:0;left:0;bottom:0;width:85%;max-width:320px;z-index:200;transform:translateX(-100%);transition:transform .25s ease;padding-top:calc(14px + var(--safe-top));padding-bottom:calc(14px + var(--safe-bottom))}
+    aside#sidebar.open{transform:translateX(0);box-shadow:4px 0 24px rgba(0,0,0,.5)}
+    #closeSidebar{display:flex}
+    #menuBtn{display:flex}
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:150;opacity:0;pointer-events:none;transition:opacity .25s ease}
+    .overlay.show{opacity:1;pointer-events:auto}
+    .preview-body{grid-template-columns:1fr;position:relative}
+    #changedFiles{position:absolute;inset:0;border-right:0;background:var(--panel);z-index:2;display:none}
+    #changedFiles.show{display:block}
+    #previewFrame{position:absolute;inset:0}
+    .preview-tabs{display:flex}
+    .modal{padding:0}
+    .modal-box{width:100%;height:100dvh;border-radius:0;border:0}
+    .modal-box header{padding-top:calc(12px + var(--safe-top))}
+    .modal-box footer button{flex:1;max-width:none}
+    .msg{max-width:92%}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="overlay" class="overlay"></div>
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <span>Assistant</span>
+      </div>
+      <button id="closeSidebar" aria-label="Fermer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <button id="newProject">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Nouveau projet
+    </button>
+    <ul id="projectList"></ul>
+  </aside>
+  <main>
+    <header id="topbar">
+      <button id="menuBtn" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div id="projectName">Aucun projet</div>
+      <div id="status" class="status">prêt</div>
+    </header>
+    <div id="messages"></div>
+    <div id="composer">
+      <div id="attachments"></div>
+      <div class="composer-row">
+        <label class="attach" title="Joindre">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          <input type="file" id="fileInput" multiple hidden/>
+        </label>
+        <textarea id="input" placeholder="Décris ce que tu veux faire…" rows="1"></textarea>
+        <button id="send" aria-label="Envoyer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </main>
+</div>
+<div id="previewModal" class="modal hidden">
+  <div class="modal-box">
+    <header>
+      <strong>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Aperçu avant déploiement
+      </strong>
+      <button id="closePreview" aria-label="Fermer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </header>
+    <div class="preview-tabs">
+      <button data-tab="preview" class="active">Aperçu</button>
+      <button data-tab="files">Fichiers</button>
+    </div>
+    <div class="preview-body">
+      <ul id="changedFiles"></ul>
+      <iframe id="previewFrame" sandbox="allow-scripts allow-forms"></iframe>
+    </div>
+    <footer>
+      <button id="rejectPreview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Refuser
+      </button>
+      <button id="approvePreview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Confirmer
+      </button>
+    </footer>
+  </div>
+</div>
+<script>
+/* ⚠️ REMPLACE PAR L'URL DE TON BACKEND (Render, Railway, local…) */
+const API_BASE = 'http://localhost:3000';
+
+const state = { projects: [], currentId: null, attachments: [], pendingFiles: null };
+const $ = (id) => document.getElementById(id);
+const isMobile = () => window.innerWidth <= 768;
+
+function openSidebar(){ $('sidebar').classList.add('open'); $('overlay').classList.add('show'); }
+function closeSidebar(){ $('sidebar').classList.remove('open'); $('overlay').classList.remove('show'); }
+$('menuBtn').onclick = openSidebar;
+$('closeSidebar').onclick = closeSidebar;
+$('overlay').onclick = closeSidebar;
+
+function setStatus(t, cls=''){ const el=$('status'); el.textContent=t; el.className='status '+cls; }
+function currentProject(){ return state.projects.find(p => p.id === state.currentId); }
+function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+const ICON_EXTERNAL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
+const ICON_FILE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+const ICON_EYE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+
+function renderProjects(){
+  const ul=$('projectList'); ul.innerHTML='';
+  state.projects.forEach(p => {
+    const li=document.createElement('li');
+    li.className = p.id===state.currentId?'active':'';
+    li.innerHTML = `<span>${escapeHtml(p.name)}</span>${p.url?`<a href="${p.url}" target="_blank" title="Ouvrir">${ICON_EXTERNAL}</a>`:''}`;
+    li.onclick = (e) => { if(!e.target.closest('a')) selectProject(p.id); };
+    ul.appendChild(li);
+  });
+}
+function renderMessages(){
+  const box=$('messages'); box.innerHTML='';
+  const p=currentProject(); if(!p) return;
+  p.messages.forEach((m) => {
+    const div=document.createElement('div');
+    div.className='msg '+m.role;
+    div.textContent=m.content;
+    if(m.files&&m.files.length){
+      const f=document.createElement('div'); f.className='files';
+      f.innerHTML=m.files.map(n=>`<span>${escapeHtml(n)}</span>`).join('');
+      div.appendChild(f);
+    }
+    if(m.role==='assistant' && m.pendingFiles){
+      const btn = document.createElement('button');
+      btn.className = 'preview-btn';
+      btn.innerHTML = `${ICON_EYE} Voir l'aperçu`;
+      btn.onclick = () => { state.pendingFiles = m.pendingFiles; openPreview(m.pendingFiles); };
+      div.appendChild(btn);
+    }
+    box.appendChild(div);
+  });
+  box.scrollTop=box.scrollHeight;
+}
+function renderAttachments(){
+  const box=$('attachments'); box.innerHTML='';
+  state.attachments.forEach((a,i)=>{
+    const chip=document.createElement('div'); chip.className='chip';
+    chip.innerHTML=`<span>${escapeHtml(a.name)}</span><button data-i="${i}" aria-label="Retirer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+    chip.querySelector('button').onclick=()=>{ state.attachments.splice(i,1); renderAttachments(); };
+    box.appendChild(chip);
+  });
+}
+function saveLocal(){ try{ localStorage.setItem('assistant_state', JSON.stringify({ projects: state.projects, currentId: state.currentId })); }catch{} }
+function loadLocal(){ try{ const s=JSON.parse(localStorage.getItem('assistant_state')||'{}'); state.projects=s.projects||[]; state.currentId=s.currentId||null; }catch{} }
+
+function newProject(){
+  const name = prompt('Nom du projet :'); if(!name) return;
+  const p = { id:'p_'+Date.now(), name, url:null, files:{}, messages:[{
+    role:'assistant',
+    content:`Salut 👋 Je suis ton assistant de déploiement.\nProjet « ${name} » créé.\n\nEnvoie-moi tes fichiers (HTML, ZIP, CSS, JS…) puis dis-moi ce que tu veux faire. Je te montrerai un aperçu avant tout déploiement.`
+  }]};
+  state.projects.unshift(p); state.currentId=p.id;
+  saveLocal(); renderProjects(); renderMessages();
+  $('projectName').textContent=p.name;
+  if(isMobile()) closeSidebar();
+}
+
+/* ✅ VERSION COMPLÈTE : recharge aussi les fichiers depuis le serveur */
+async function selectProject(id){
+  state.currentId = id; saveLocal(); renderProjects();
+  $('projectName').textContent = currentProject()?.name || 'Aucun projet';
+  try {
+    const res = await fetch(`${API_BASE}/api/project/${id}`);
+    if (res.ok) {
+      const serverProject = await res.json();
+      const local = currentProject();
+      if (local) {
+        local.files = serverProject.files || {};
+        if (serverProject.url) local.url = serverProject.url;
+      }
+    }
+  } catch {}
+  renderMessages(); renderProjects();
+  if(isMobile()) closeSidebar();
+}
+
+$('fileInput').addEventListener('change', async (e)=>{
+  for(const file of e.target.files){
+    if(file.name.endsWith('.zip')){
+      try{
+        const zip = await JSZip.loadAsync(file);
+        const entries = Object.entries(zip.files).filter(([_,f])=>!f.dir);
+        for(const [path,f] of entries){
+          const content = await f.async('string');
+          state.attachments.push({ name:path, content });
+        }
+      }catch(err){ alert('Erreur ZIP : '+err.message); }
+    } else {
+      const text = await file.text();
+      state.attachments.push({ name:file.name, content:text });
+    }
+  }
+  renderAttachments(); e.target.value='';
+});
+
+$('send').onclick = sendMessage;
+$('input').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
+});
+
+/* ✅ VERSION COMPLÈTE : envoie uniquement les nouveaux fichiers au serveur */
+async function sendMessage(){
+  const p = currentProject();
+  if(!p){ alert("Crée d'abord un projet."); return; }
+  const text = $('input').value.trim();
+  if(!text && !state.attachments.length) return;
+
+  const uploaded = state.attachments.map(a => ({ name: a.name, content: a.content }));
+  p.messages.push({
+    role: 'user',
+    content: text + (uploaded.length ? `\n\n📎 ${uploaded.length} fichier(s)` : ''),
+    files: uploaded.map(f => f.name)
+  });
+
+  $('input').value = ''; state.attachments = []; renderAttachments();
+  renderMessages(); setStatus("Claude réfléchit…", 'busy');
+
+  try {
+    const response = await fetch(`${API_BASE}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectId: p.id,
+        userMessage: text,
+        newFiles: uploaded,
+      }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "", finalResult = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = JSON.parse(line.slice(6));
+        if (payload.error) throw new Error(payload.error);
+        if (payload.done) finalResult = payload.result;
+      }
+    }
+    if (!finalResult) throw new Error("Pas de réponse finale");
+
+    p.messages.push({
+      role: 'assistant',
+      content: finalResult.message || '(pas de réponse)',
+      files: finalResult.files ? Object.keys(finalResult.files) : null,
+      pendingFiles: finalResult.files || null,
+    });
+    renderMessages();
+
+    if (finalResult.files && Object.keys(finalResult.files).length) {
+      state.pendingFiles = finalResult.files;
+      openPreview(finalResult.files);
+      setStatus("aperçu en attente", 'busy');
+    } else {
+      setStatus('prêt', 'ok');
+    }
+    saveLocal();
+  } catch(err) {
+    p.messages.push({ role: 'assistant', content: '⚠️ Erreur : ' + err.message });
+    renderMessages(); setStatus('erreur');
+  }
+}
+
+function openPreview(files){
+  $('previewModal').classList.remove('hidden');
+  const list = $('changedFiles'); list.innerHTML='';
+  const names = Object.keys(files);
+  let active = names.find(n=>n.endsWith('.html')) || names[0];
+
+  names.forEach(name=>{
+    const li=document.createElement('li');
+    li.innerHTML = `${ICON_FILE}<span>${escapeHtml(name)}</span>`;
+    if(name===active) li.classList.add('active');
+    li.onclick=()=>{
+      active=name;
+      [...list.children].forEach(c=>c.classList.remove('active'));
+      li.classList.add('active');
+      showFile(name);
+      if(isMobile()) setTab('preview');
+    };
+    list.appendChild(li);
+  });
+  showFile(active);
+  if(isMobile()) setTab('preview');
+  else list.classList.remove('show');
+
+  function showFile(name){
+    const content = files[name];
+    if(name.endsWith('.html')||name.endsWith('.htm')){
+      $('previewFrame').srcdoc = inlineAssets(content, files);
+    } else {
+      $('previewFrame').srcdoc = `<pre style="padding:16px;font-family:monospace;white-space:pre-wrap;font-size:13px;color:#111;margin:0">${escapeHtml(content)}</pre>`;
+    }
+  }
+}
+function inlineAssets(html, files){
+  return html
+    .replace(/<link[^>]+href=["']([^"']+\.css)["'][^>]*>/g, (m,href)=>{
+      const css = files[href] || files[href.replace(/^\.?\//,'')];
+      return css ? `<style>${css}</style>` : m;
+    })
+    .replace(/<script[^>]+src=["']([^"']+\.js)["'][^>]*><\/script>/g, (m,src)=>{
+      const js = files[src] || files[src.replace(/^\.?\//,'')];
+      return js ? `<script>${js}<\/script>` : m;
+    });
+}
+function setTab(tab){
+  document.querySelectorAll('.preview-tabs button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.tab===tab);
+  });
+  $('changedFiles').classList.toggle('show', tab==='files');
+}
+document.querySelectorAll('.preview-tabs button').forEach(btn=>{
+  btn.onclick = ()=> setTab(btn.dataset.tab);
+});
+$('closePreview').onclick = ()=> $('previewModal').classList.add('hidden');
+$('rejectPreview').onclick = ()=>{
+  state.pendingFiles=null;
+  $('previewModal').classList.add('hidden');
+  setStatus('aperçu refusé');
+  const p = currentProject();
+  const last = [...p.messages].reverse().find(m=>m.pendingFiles);
+  if(last) last.pendingFiles = null;
+  p.messages.push({ role:'assistant', content:"❌ Modifications refusées. Rien n'a été déployé." });
+  renderMessages(); saveLocal();
+};
+
+/* ✅ VERSION COMPLÈTE : envoie seulement les fichiers modifiés, fusion serveur */
+$('approvePreview').onclick = async () => {
+  const p = currentProject();
+  if (!p || !state.pendingFiles) return;
+  setStatus('déploiement…', 'busy');
+  try {
+    const res = await fetch(`${API_BASE}/api/deploy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectId: p.id,
+        projectName: p.name,
+        newFiles: state.pendingFiles,
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+
+    p.files = { ...p.files, ...state.pendingFiles };
+    p.url = data.url;
+    const last = [...p.messages].reverse().find(m => m.pendingFiles);
+    if (last) last.pendingFiles = null;
+    p.messages.push({ role: 'assistant', content: `✅ Déploiement réussi !\nURL : ${data.url}` });
+    state.pendingFiles = null;
+    $('previewModal').classList.add('hidden');
+    renderMessages(); renderProjects(); saveLocal();
+    setStatus('en ligne', 'ok');
+  } catch (err) {
+    setStatus('erreur déploiement');
+    alert('Erreur : ' + err.message);
+  }
+};
+
+loadLocal(); renderProjects();
+if(state.currentId) selectProject(state.currentId);
+$('newProject').onclick = newProject;
+</script>
+</body>
+</html>
